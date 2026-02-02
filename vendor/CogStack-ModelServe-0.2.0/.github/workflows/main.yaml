@@ -1,0 +1,44 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [
+          '3.10',
+          '3.11',
+          '3.12',
+        ]
+      max-parallel: 4
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv and set Python to ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.10"
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          uv sync --extra dev --extra docs --extra llm
+          uv run python -m ensurepip
+      - name: Check types
+        run: |
+          uv run mypy app
+      - name: Lint
+        run: |
+          uv run ruff check
+      - name: Run unit tests
+        run: |
+          uv run pytest -v tests/app --cov --cov-report=html:coverage_reports #--random-order
+      - name: Run integration tests
+        run: |
+          uv run pytest -s -v tests/integration

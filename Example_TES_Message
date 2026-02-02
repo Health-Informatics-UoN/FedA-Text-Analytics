@@ -1,0 +1,25 @@
+{
+    "name": "tre-modelserve-medcat",
+    "description": "Run MedCAT SNOMED NER over OMOP notes",
+    "executors": [
+        {
+            "image": "ghcr.io/Thomas-Rowlands/FedA-Text-Analytics:latest",
+            "command": [
+                "--model",
+                "medcat_snomed",
+                "--query",
+                "SELECT * FROM note LIMIT 50",
+                "--batch-size",
+                "50",
+                "--output",
+                "/outputs/ner_clinical_results.csv"
+            ]
+        }
+    ],
+    "outputs": [
+        {
+            "name": "results",
+            "path": "/outputs/ner_clinical_results.csv"
+        }
+    ]
+}

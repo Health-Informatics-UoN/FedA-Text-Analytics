@@ -1,0 +1,137 @@
+name: docker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: docker.io
+  DOCKER_IMAGE_NAME: cogstacksystems/cogstack-modelserve
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container: hadolint/hadolint:latest-debian
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint
+        run: hadolint --ignore DL3008 --ignore DL3013 --ignore DL3003 --ignore DL4006 docker/Dockerfile* docker/**/Dockerfile*
+
+  build-and-push:
+    needs: lint
+    if: |
+      github.repository == 'CogStack/CogStack-ModelServe' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'pull_request' ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    concurrency: build-and-push
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Extract CMS meta
+        id: cms_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
+            type=sha
+            type=match,pattern=cogstack-modelserve/v(\d+\.\d+\.\d+),group=1
+
+      - name: Build and push CMS
+        uses: docker/build-push-action@v6
+        id: build_and_push_cms
+        with:
+          platforms: linux/amd64,linux/arm64
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.cms_meta.outputs.tags }}
+          labels: ${{ steps.cms_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Attest image artifacts
+        uses: actions/attest-build-provenance@v2
+        id: attest
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+          subject-digest: ${{ steps.build_and_push_cms.outputs.digest }}
+          push-to-registry: true
+
+      - name: Update Docker Hub description
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.DOCKER_IMAGE_NAME }}
+          readme-filepath: ./README.md
+        continue-on-error: true # This step requires DockerHub delete scope which is not guaranteed.
+
+  smoke-test:
+    needs: build-and-push
+    if: |
+      github.repository == 'CogStack/CogStack-ModelServe' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'pull_request' ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the test model
+        run: |
+          wget -O test_model.zip https://cogstack-medcat-example-models.s3.eu-west-2.amazonaws.com/medcat-example-models/medmen_wstatus_2021_oct.zip
+
+      - name: Run the CMS container
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          docker run -d --name cms-test \
+            -p 8000:8000 \
+            -e CMS_MODEL_NAME="Test Model" \
+            -e CMS_MODEL_TYPE="medcat_umls" \
+            -v $(pwd)/test_model.zip:/app/model/model.zip \
+            ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:sha-${SHORT_SHA}
+
+      - name: Wait for the CMS container to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/readyz; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "CMS did not become ready in time"
+          exit 1

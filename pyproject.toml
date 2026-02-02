@@ -1,0 +1,16 @@
+[project]
+name = "feda-text-analytics"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3>=1.40.55",
+    "dotenv>=0.9.9",
+    "flask>=3.1.2",
+    "minio>=7.2.18",
+    "pandas>=2.3.3",
+    "psycopg>=3.2.11",
+    "py-tes>=1.1.2",
+    "requests>=2.32.5",
+]

@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+mimic_discharge_pdfs/
+
+# data files
+mimic_4_data/
+mimic_3_data/
+OMOP_Vocabs/
+OntologyData/
+
+# model files
+models/
+
+# vscode
+.vscode/

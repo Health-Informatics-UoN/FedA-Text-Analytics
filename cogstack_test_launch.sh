@@ -1,0 +1,1 @@
+cms serve --model-type medcat_snomed --model-path="/mnt/sda2/MedCAT Models/mc_modelpack_snomed.zip"
