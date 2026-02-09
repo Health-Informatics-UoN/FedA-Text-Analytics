@@ -10,8 +10,6 @@ from db import get_db_conn, fetch_notes_by_query, fetch_all_notes
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from ontology_processing import snomed_filter
-
 load_dotenv("config.env")
 
 MODEL_SERVE_URL = "http://" + os.getenv("MODEL_SERVE_URL", "127.0.0.1:8000")
@@ -168,10 +166,6 @@ def run_model():
             try:
                 outputs = modelserve_custom(texts)
                 for note_id, output in zip(note_ids, outputs):
-                    # Filter SNOMED
-                    # print("Before filter: ", len(output["annotations"]))
-                    # filtered_output = snomed_filter(output)
-                    # print("After filter: ", len(filtered_output["annotations"]))
                     results.append({
                         "note_id": note_id,
                         "modelserve_output": json.dumps(output),
