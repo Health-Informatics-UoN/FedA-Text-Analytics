@@ -40,8 +40,7 @@ def run_model(
         response = requests.post(
             model_url,
             headers=headers,
-            json=texts,
-            timeout=MODEL_SERVE_TIMEOUT
+            json=texts
         )
         response.raise_for_status()
         return response.json()
@@ -97,9 +96,9 @@ def main():
         description="Run NLP model over OMOP notes and write results to CSV"
     )
     parser.add_argument("--model", required=True)
-    parser.add_argument("--query")
-    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--query", required=True)
+    parser.add_argument("--batch_size", type=int, default=DEFAULT_BATCH_SIZE)
+    parser.add_argument("--output_csv", required=True)
 
     args = parser.parse_args()
 
@@ -107,7 +106,7 @@ def main():
         model=args.model,
         query=args.query,
         batch_size=args.batch_size,
-        output_csv=args.output
+        output_csv=args.output_csv
     )
 
 
